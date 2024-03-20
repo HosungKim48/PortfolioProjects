@@ -9,7 +9,7 @@ SELECT
   * 
 FROM 
   PUBLIC."Nashville_Housing";
-----------------------------------------------------------------------------------------------
+---------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------
 
 /* Standardizing Date Format */
 SELECT 
@@ -22,7 +22,7 @@ UPDATE
   PUBLIC."Nashville_Housing" 
 SET 
   "SaleDate" = CAST("SaleDate" AS date);
-----------------------------------------------------------------------------------------------
+---------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------
 
 /* Populate Property Address data */
 -- Looking at some NULL values in PropertyAddress column
@@ -35,7 +35,8 @@ WHERE
 ORDER BY 
   "ParcelID";
   
--- Looking for blanks in PropertyAddress column that could be filled out with other data where it has same ParecelID but different UniqueID (If UniqueID is the same, then it should be deleted later when removing duplicates.)
+-- Looking for blanks in PropertyAddress column that could be filled out with other data where it has same ParecelID but different UniqueID 
+-- (If UniqueID is the same, then it should be deleted later when removing duplicates.)
 SELECT 
   A."ParcelID", 
   A."PropertyAddress", 
@@ -59,7 +60,7 @@ FROM
   AND A."UniqueID" != B."UniqueID" 
 WHERE 
   A."PropertyAddress" IS NULL;
-----------------------------------------------------------------------------------------------
+---------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------
 
 /* Breaking out Address into Individual Columns (Address, City, State) */
 -- Breaking Address by a delimiter(,)
@@ -142,7 +143,7 @@ Update
 SET 
   OwnerAddress_State = SPLIT_PART("OwnerAddress", ',', 3);
   
-----------------------------------------------------------------------------------------------
+---------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------
 
 /* Change Y and N to Yes and No in "SoldAsVacant" field */
 --Looking at different kinds of answers
@@ -165,7 +166,7 @@ Update
 Set 
   "SoldAsVacant" = Case When "SoldAsVacant" = 'Y' Then 'Yes' When "SoldAsVacant" = 'N' Then 'No' Else "SoldAsVacant" End;
   
-----------------------------------------------------------------------------------------------
+---------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------
 
 /* Remove Duplicates */
 --Identifying duplicates
@@ -219,7 +220,7 @@ Where
       DuplicateCount > 1
   );
   
-----------------------------------------------------------------------------------------------
+---------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------
 -- Delete Unused Columns(OwnerAddress & PropertyAddress)
 Alter Table 
   public."Nashville_Housing" 
