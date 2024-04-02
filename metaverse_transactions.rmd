@@ -1,0 +1,205 @@
+---
+title: "Metaverse Transactions Data Analysis"
+author: "Hosung Kim"
+date: "2024-04-02"
+output: html_document
+---
+
+### Background for this project
+This project aims to review each steps of data analysis with R from data cleaning to data analysis and visualization. 
+
+### Data Exploration & Cleaning
+
+```{r Importing metaverse transactions dataset}
+library(tidyverse)
+library(ggplot2)
+
+meta_trans.df <- read_csv("/Users/hosungkim/Desktop/Data Analysis/Portfolio/Case Study/Metaverse_transactions/metaverse_transactions_dataset.csv")
+```
+
+```{r Exploring and understanding the dataset}
+head(meta_trans.df)
+```
+
+#### Checking if Timestamp and Hour of Day matches the time value
+
+##### Extracting hour from Timestamp 
+```{r Timestamp & Hour of Day}
+hour_in_Timestamp <- as.POSIXct(meta_trans.df$timestamp, format="%d/%m/%Y %H:%M:%S")
+hour_in_Timestamp <- format(hour_in_Timestamp, format="%k")
+
+hour_data = data.frame(column1=trimws(hour_in_Timestamp), 
+                  column2 = trimws(meta_trans.df$hour_of_day))
+head(hour_data)
+```
+
+##### Verifying if two values are identical
+```{r}
+identical(hour_data$column1, hour_data$column2)
+```
+
+#### Difference between Phishing and Scamming
+
+Phishing is a type of online scam that targets consumers by sending them an e-mail that appears to be from a well-known source - an internet service provider, a bank, or a mortgage company, for example (Federal Trade Commsion). As metaverse provides various unprecedented ways to make connections with users, cybercrimes are rising and being more sophisticated before. One of the most common ways of metaverse phishing is impersonating brands. For example, users might receive fake messages or emails directing them to fraudulent websites that mimic popular virtual marketplaces or platforms. In this data, "scam" includes various deceptive practices aimed at exploiting users for financial gain or other malicious purposes except for phishing.
+
+```{r}
+unique(meta_trans.df$transaction_type)
+```
+
+#### Anomaly & Risk_score
+
+My first impression about anomaly and risk_score is that they look like a same indicator for identifying possibilities of scamming or phishing.
+
+```{r}
+# Converting the character variable to a numeric representation
+encoded_anomaly <- as.numeric(factor(meta_trans.df$anomaly, levels = c("low_risk", "moderate_risk", "high_risk")))
+
+# Calculate correlation
+correlation <- cor(meta_trans.df$risk_score, encoded_anomaly)
+print(correlation)
+```
+```{r}
+ggplot(meta_trans.df, aes(x = meta_trans.df$risk_score, y = encoded_anomaly)) +
+  geom_point() +  
+  geom_smooth(method = "lm", se = FALSE) +  
+  labs(x = "risk score", y = "anomaly", title = "risk score vs anomaly")  
+```
+
+#### Duplicates
+```{r}
+unique(duplicated(meta_trans.df))
+```
+
+
+
+### Data Analysis
+
+#### Assumption 1
+##### New users would be more prone to scamming and phishing than the established and veteran.
+
+```{r}
+meta_trans.df$anomaly <- factor(meta_trans.df$anomaly, levels = c("low_risk", "moderate_risk", "high_risk"))
+
+# Calculate the counts
+counts <- meta_trans.df %>%
+  count(anomaly, age_group, name = "count") %>%
+  complete(anomaly, age_group, fill = list(count = 0))
+
+counts
+```
+
+
+```{r}
+# Plotting
+ggplot(counts, aes(x = age_group, y = count, fill = anomaly)) +
+  geom_bar(stat = "identity", position = "dodge", color = "black") + 
+  labs(title = "Risk Type Distribution by Age Group",
+       x = "Age Group",
+       y = "Count of Risk Types",
+       fill = "Risk Type") +
+  scale_fill_manual(values = c("low_risk" = "#1f77b4", "moderate_risk" = "#ff7f0e", "high_risk" = "#d62728"),
+                     name = "Risk Type",
+                     labels = c("Low Risk", "Moderate Risk", "High Risk")) +
+  theme_minimal() +
+  theme(plot.title = element_text(hjust = 0.5), 
+        axis.title = element_text(size = 12), 
+        axis.text = element_text(size = 10),  
+        legend.title = element_text(size = 10), 
+        legend.text = element_text(size = 10))  
+```
+
+##### Result: high_risk transactions only occurred in "new" age group.
+
+
+#### Assumption 2
+##### Transaction amount wouldn't be a clue to prevent scamming or phishing.
+```{r}
+# Calculate the mean amount for each anomaly level
+mean_amount <- meta_trans.df %>%
+  group_by(anomaly) %>%
+  summarize(mean_amount = mean(amount))
+
+# Plotting bar chart with mean amount for each anomaly level
+ggplot(mean_amount, aes(x = anomaly, y = mean_amount, fill = anomaly)) +
+  geom_bar(stat = "identity") +
+  labs(title = "Average Amount by Anomalies",
+       x = "Anomaly",
+       y = "Average Transaction Amount",
+       fill = "Anomaly Level") +
+  scale_fill_manual(values = c("low_risk" = "blue", "moderate_risk" = "orange", "high_risk" = "red")) +  # Specify fill colors
+  theme_minimal() +
+  theme(axis.text.x = element_text(angle = 45, hjust = 1))
+
+```
+```{r}
+# Plotting density plot
+ggplot(meta_trans.df, aes(x = amount, fill = anomaly)) +
+  geom_density(alpha = 0.5) +  
+  geom_vline(data = mean_amount, aes(xintercept = mean_amount, color = anomaly), linetype = "dashed", size = 0.5) +  
+  labs(title = "Distribution of Amount by Anomaly Level",
+       x = "Amount",
+       y = "Density",
+       fill = "Anomaly Level") +
+  scale_fill_manual(values = c("low_risk" = "blue", "moderate_risk" = "orange", "high_risk" = "red")) +
+  scale_color_manual(values = c("low_risk" = "blue", "moderate_risk" = "orange", "high_risk" = "red")) +  
+  theme_minimal()
+```
+
+##### Result: Transaction amounts depending on anomaly level have no patterns.
+
+
+#### Assumption 3
+##### Session duration of scamming or phishing might be relatively shorter than other transactions. As official websites use Two-factor authentication, well known as 2FA, to counter phishing attacks, the length of a visitor's stay on a credible website might be longer than malicious websites. Moreover, long session duration reflects high content quality of blog posts and product pages, which all increases user's engagement.
+
+```{r}
+# Calculate the mean session duration for each anomaly level
+mean_session_duration <- meta_trans.df %>%
+  group_by(anomaly) %>%
+  summarize(mean_duration = mean(session_duration))
+
+# Define colors for each anomaly level
+anomaly_colors <- c("low_risk" = "blue", "moderate_risk" = "orange", "high_risk" = "red")
+
+# Plotting bar chart with mean session duration for each anomaly level
+ggplot(mean_session_duration, aes(x = anomaly, y = mean_duration, fill = anomaly)) +
+  geom_bar(stat = "identity") +
+  labs(title = "Average Session Duration by Anomaly Level",
+       x = "Anomaly Level",
+       y = "Average Session Duration (seconds)",
+       fill = "Anomaly Level") +
+  scale_fill_manual(values = anomaly_colors) +  
+  theme_minimal() +
+  theme(axis.text.x = element_text(angle = 45, hjust = 1))
+
+```
+
+```{r}
+# Plotting histogram of session durations for each anomaly level
+ggplot(meta_trans.df, aes(x = session_duration, fill = anomaly)) +
+  geom_histogram(aes(y = ..density..), bins = 30, alpha = 0.5) +
+  labs(title = "Distribution of Session Durations by Anomaly Level",
+       x = "Session Duration (seconds)",
+       y = "Density",
+       fill = "Anomaly Level") +
+  scale_fill_manual(values = c("low_risk" = "blue", "moderate_risk" = "orange", "high_risk" = "red")) +  # Specify fill colors
+  theme_minimal() +
+  theme(axis.text.x = element_text(angle = 45, hjust = 1))
+
+```
+```{r}
+# Plotting density plot of session durations for each anomaly level
+ggplot(meta_trans.df, aes(x = session_duration, fill = anomaly)) +
+  geom_density(alpha = 0.5) +  
+  geom_vline(data = mean_session_duration, aes(xintercept = mean_duration, color = anomaly), linetype = "dashed", size = 0.5) +  
+  labs(title = "Distribution of Session Duration by Anomaly Level",
+       x = "Session Duration (seconds)",
+       y = "Density",
+       fill = "Anomaly Level") +
+  scale_fill_manual(values = c("low_risk" = "blue", "moderate_risk" = "orange", "high_risk" = "red")) +
+  scale_color_manual(values = c("low_risk" = "blue", "moderate_risk" = "orange", "high_risk" = "red")) +  
+  theme_minimal()
+
+```
+
+##### Result: Session Duration is significantly short in high_risk transactions.
+
